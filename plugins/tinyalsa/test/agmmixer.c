@@ -31,6 +31,7 @@
 #include <expat.h>
 #include <tinyalsa/asoundlib.h>
 #include <sound/asound.h>
+#include <cutils/properties.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -598,14 +599,33 @@ int set_agm_audio_intf_metadata(struct mixer *mixer, char *intf_name, unsigned i
     }
 
     if (usecase == PLAYBACK) {
-        gkv[0].key = DEVICERX;
-        gkv[0].value = dkv ? dkv : SPEAKER;
+//ASUS_BSP for loopback test +++
+        if ((val == PCM_RX_LOOPBACK) && (!strcmp(intf_name, "CODEC_DMA-LPAIF_RXTX-RX-0"))) {
+            gkv[0].key = DEVICERX;
+            gkv[0].value = dkv ? dkv : HEADPHONES;
+        } else {
+//ASUS_BSP for loopback test ---
+            gkv[0].key = DEVICERX;
+            gkv[0].value = dkv ? dkv : SPEAKER;
+        }
     } else if (usecase == HAPTICS) {
         gkv[0].key = DEVICERX;
         gkv[0].value = HAPTICS_DEVICE;
     } else if (val == VOICE_UI) {
         gkv[0].key = DEVICETX;
         gkv[0].value = HANDSETMIC_VA;
+//ASUS_BSP for loopback test +++
+    } else if (val == PCM_RX_LOOPBACK) {
+        char IsHeadsetTest[256] = {0};
+        property_get("vendor.audio.loopback.headsetmic", IsHeadsetTest, "");
+        if (!strcmp(IsHeadsetTest, "1")) {
+            gkv[0].key = DEVICETX;
+            gkv[0].value = dkv ? dkv : HEADPHONE_MIC;
+        } else {
+            gkv[0].key = DEVICETX;
+            gkv[0].value = dkv ? dkv : HANDSETMIC;
+        }
+//ASUS_BSP for loopback test ---
     } else {
         gkv[0].key = DEVICETX;
         gkv[0].value = dkv ? dkv : HANDSETMIC;
@@ -913,6 +933,11 @@ int set_agm_stream_metadata(struct mixer *mixer, int device, uint32_t val, enum 
             num_gkv = 3;
     }
 
+//ASUS_BSP for loopback test +++
+    if(val == PCM_RX_LOOPBACK)
+        num_gkv= 1;
+//ASUS_BSP for loopback test ---
+
     gkv_size = num_gkv * sizeof(struct agm_key_value);
     ckv_size = num_ckv * sizeof(struct agm_key_value);
     prop_size = sizeof(struct prop_data) + (num_props * sizeof(uint32_t));
@@ -953,9 +978,9 @@ int set_agm_stream_metadata(struct mixer *mixer, int device, uint32_t val, enum 
             index++;
         }
     } else {
-        if (usecase == PLAYBACK)
+        if ((usecase == PLAYBACK) || (usecase == LOOPBACK))//ASUS_BSP for loopback test +++
             gkv[index].key = STREAMRX;
-        else
+        else if(usecase == CAPTURE)//ASUS_BSP for loopback test +++
             gkv[index].key = STREAMTX;
 
         gkv[index].value = val;
@@ -972,7 +997,7 @@ int set_agm_stream_metadata(struct mixer *mixer, int device, uint32_t val, enum 
         if (usecase == PLAYBACK  && val != HAPTICS_PLAYBACK) {
             gkv[index].key = DEVICEPP_RX;
             gkv[index].value = DEVICEPP_RX_AUDIO_MBDRC;
-        } else if (val != HAPTICS_PLAYBACK) {
+        } else if (usecase == CAPTURE) {//ASUS_BSP for loopback test +++
             gkv[index].key = DEVICEPP_TX;
             gkv[index].value = DEVICEPP_TX_AUDIO_FLUENCE_SMECNS;
         }

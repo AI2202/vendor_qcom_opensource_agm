@@ -24,7 +24,8 @@ endif
 
 
 LOCAL_SHARED_LIBRARIES += \
-     libexpat
+     libexpat \
+     libcutils
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -151,3 +152,34 @@ LOCAL_SHARED_LIBRARIES += \
     libagmmixer
 
 include $(BUILD_EXECUTABLE)
+
+#agmhostless +++
+include $(CLEAR_VARS)
+
+LOCAL_MODULE        := agmhostless
+LOCAL_MODULE_OWNER  := qti
+LOCAL_MODULE_TAGS   := optional
+LOCAL_VENDOR_MODULE := true
+
+LOCAL_CFLAGS        += -Wno-unused-parameter -Wno-unused-result
+LOCAL_CFLAGS        += -DBACKEND_CONF_FILE=\"/vendor/etc/backend_conf.xml\"
+LOCAL_SRC_FILES     := agmhostless.c
+
+LOCAL_HEADER_LIBRARIES := \
+    libagm_headers \
+    libacdb_headers
+
+#if android version is R, refer to qtitinyxx otherwise use upstream ones
+#This assumes we would be using AR code only for Android R and subsequent versions.
+ifneq ($(filter 11 R, $(PLATFORM_VERSION)),)
+LOCAL_C_INCLUDES += $(TOP)/vendor/qcom/opensource/tinyalsa/include
+LOCAL_SHARED_LIBRARIES += libqti-tinyalsa
+else
+LOCAL_SHARED_LIBRARIES += libtinyalsa
+endif
+
+LOCAL_SHARED_LIBRARIES += \
+    libagmmixer
+
+include $(BUILD_EXECUTABLE)
+#agmhostless ---

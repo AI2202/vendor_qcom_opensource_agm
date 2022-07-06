@@ -49,6 +49,7 @@ void sigint_handler(int sig)
 char *capture_audio_interface_name[] = {
     "CODEC_DMA-LPAIF_VA-TX-0",
     "CODEC_DMA-LPAIF_VA-TX-1",
+    "CODEC_DMA-LPAIF_RXTX-TX-3",//ASUS_BSP for loopback test +++
     "MI2S-LPAIF_AXI-TX-PRIMARY",
     "TDM-LPAIF_AXI-TX-PRIMARY",
     "AUXPCM-LPAIF_AXI-TX-PRIMARY",
@@ -57,6 +58,7 @@ char *capture_audio_interface_name[] = {
 char *playback_audio_interface_name[] = {
     "CODEC_DMA-LPAIF_WSA-RX-0",
     "CODEC_DMA-LPAIF_WSA-RX-1",
+    "CODEC_DMA-LPAIF_RXTX-RX-0",//ASUS_BSP for loopback test +++
     "MI2S-LPAIF_AXI-RX-PRIMARY",
     "TDM-LPAIF_AXI-RX-PRIMARY",
     "AUXPCM-LPAIF_AXI-RX-PRIMARY",
@@ -206,7 +208,7 @@ void play_loopback(unsigned int card, unsigned int p_device, unsigned int c_devi
                  unsigned int rate, enum pcm_format format, unsigned int period_size,
                  unsigned int period_count, unsigned int play_cap_time, unsigned int capture_intf, unsigned int play_intf)
 {
-    struct pcm_config config;
+    struct pcm_config config,c_config;
     struct pcm *p_pcm, *c_pcm;
     struct mixer *mixer;
     char *buffer;
@@ -218,6 +220,7 @@ void play_loopback(unsigned int card, unsigned int p_device, unsigned int c_devi
     struct timespec end;
     struct timespec now;
 
+    //playback config,headphone need to set channel to 2,speaker/receiver set channel to 1.
     memset(&config, 0, sizeof(config));
     config.channels = channels;
     config.rate = rate;
@@ -228,6 +231,17 @@ void play_loopback(unsigned int card, unsigned int p_device, unsigned int c_devi
     config.stop_threshold = 0;
     config.silence_threshold = 0;
 
+    //capture config need to set channel to 1
+    memset(&c_config, 0, sizeof(c_config));
+    c_config.channels = 1;
+    c_config.rate = rate;
+    c_config.period_size = period_size;
+    c_config.period_count = period_count;
+    c_config.format = format;
+    c_config.start_threshold = 0;
+    c_config.stop_threshold = 0;
+    c_config.silence_threshold = 0;
+    
     mixer = mixer_open(card);
     if (!mixer) {
         printf("Failed to open mixer\n");
@@ -241,7 +255,7 @@ void play_loopback(unsigned int card, unsigned int p_device, unsigned int c_devi
         goto err_close_mixer;
     }
 
-    if (set_agm_device_media_config(mixer, channels, rate,
+    if (set_agm_device_media_config(mixer, c_config.channels, rate,
                                     pcm_format_to_bits(format), c_intf_name)) {
         printf("Failed to set capture device media config\n");
         goto err_close_mixer;
@@ -258,8 +272,8 @@ void play_loopback(unsigned int card, unsigned int p_device, unsigned int c_devi
         goto err_close_mixer;
     }
 
-    if (set_agm_stream_metadata(mixer, c_device, PCM_RX_LOOPBACK, LOOPBACK, STREAM_PCM, NULL)) {
-        printf("Failed to capture stream metadata\n");
+    if (set_agm_stream_metadata(mixer, p_device, PCM_RX_LOOPBACK, LOOPBACK, STREAM_PCM, NULL)) {//ASUS_BSP for loopback test +++
+        printf("Failed to playback stream metadata\n");//ASUS_BSP for loopback test +++
         goto err_close_mixer;
     }
 
@@ -294,7 +308,7 @@ void play_loopback(unsigned int card, unsigned int p_device, unsigned int c_devi
         goto err_close_p_pcm;
     }
 
-    c_pcm = pcm_open(card, c_device, PCM_IN, &config);
+    c_pcm = pcm_open(card, c_device, PCM_IN, &c_config);
     if (!c_pcm || !pcm_is_ready(c_pcm)) {
         printf("Unable to open playback PCM device (%s)\n",
                 pcm_get_error(c_pcm));

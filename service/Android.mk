@@ -19,6 +19,18 @@ LOCAL_CFLAGS        += -Wno-tautological-compare -Wno-macro-redefined -Wall
 LOCAL_CFLAGS        += -D_GNU_SOURCE -DACDB_PATH=\"/vendor/etc/acdbdata/\"
 LOCAL_CFLAGS        += -DACDB_DELTA_FILE_PATH="/data/vendor/audio/acdbdata/delta"
 
+# ASUS_BSP for load customized acdb  +++
+ifeq ($(ASUS_BUILD_PROJECT),AI2201)
+LOCAL_CFLAGS        += -DASUS_PROJECT_NAME=\"AI2201\"
+endif
+
+ifeq ($(ASUS_BUILD_PROJECT),AI2202)
+LOCAL_CFLAGS        += -DASUS_PROJECT_NAME=\"AI2202\"
+LOCAL_CFLAGS        += -DASUS_PROJECT_NAME_EU=\"AI2202_EU\"
+LOCAL_CFLAGS        += -DASUS_AI2202_PROJECT
+endif
+# ASUS_BSP for load customized acdb  ---
+
 LOCAL_C_INCLUDES    := $(LOCAL_PATH)/inc/public
 LOCAL_C_INCLUDES    += $(LOCAL_PATH)/inc/private
 

@@ -37,6 +37,7 @@
 #include <dirent.h>
 #include <dlfcn.h>
 #include <unistd.h>
+#include <cutils/properties.h>
 #include "gsl_intf.h"
 #include <agm/graph.h>
 #include <agm/graph_module.h>
@@ -56,6 +57,9 @@
 
 #define TAGGED_MOD_SIZE_BYTES 1024
 
+#if defined ASUS_AI2202_PROJECT
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
+#endif
 
 /* TODO: remove this later after including in spf header files */
 #define PARAM_ID_SOFT_PAUSE_START 0x800102e
@@ -275,6 +279,68 @@ done:
     return ret;
 }
 
+//ASUS_BSP +++
+#ifdef ASUS_AI2202_PROJECT
+static const char * const non_eu_country_table[] = {
+    "JP",
+    "TW",
+    "IN",
+    "HK",
+    "ID",
+    "WW",
+    "BR",
+    "MS",
+    "MJ",
+};
+
+static bool is_non_eu_country()
+{
+    FILE *fp = NULL;
+    char country[8] = {0};
+
+    fp = fopen("/vendor/factory/COUNTRY", "r");
+    if (fp == NULL) {
+        ALOGE("failed to open the file");
+        return false;
+    } else if (fgets(country, 3, fp) == NULL) {
+        ALOGE("failed to get country");
+        fclose(fp);
+        return false;
+    }
+    fclose(fp);
+
+    ALOGD("get country: %s", country);
+
+    unsigned int i = 0;
+    for (i = 0; i < ARRAY_SIZE(non_eu_country_table); i++) {
+        if (!strcmp(country, non_eu_country_table[i])) {
+            return true;
+        }
+    }
+
+    if (!strcmp(country, "WW")) {
+        char customer[PROPERTY_VALUE_MAX] = {0};
+        fp = fopen("/vendor/factory/CUSTOMER", "r");
+        if (fp == NULL) {
+            ALOGE("failed to open the file");
+            return false;
+        } else if (fgets(customer, PROPERTY_VALUE_MAX, fp) == NULL) {
+            ALOGE("failed to get customer");
+            fclose(fp);
+            return false;
+        }
+        fclose(fp);
+
+        ALOGD("get customer: %s", customer);
+
+        if (!strcmp(customer, "ASUS"))
+            return true;
+    }
+
+    return false;
+}
+#endif
+
 int graph_init()
 {
     uint32_t ret = 0;
@@ -298,11 +364,36 @@ int graph_init()
         ret = -ENOENT;
         goto err;
     }
+
+// ASUS_BSP for load customized acdb +++
+#ifdef ASUS_PROJECT_NAME
+#if defined ASUS_AI2202_PROJECT
+	if (is_non_eu_country()) {
+	    ret = snprintf(acdb_path, ACDB_PATH_MAX_LENGTH, "%s%s", ACDB_PATH, ASUS_PROJECT_NAME);
+	} else {
+	    ret = snprintf(acdb_path, ACDB_PATH_MAX_LENGTH, "%s%s", ACDB_PATH, ASUS_PROJECT_NAME_EU);
+	}
+#else
+	ret = snprintf(acdb_path, ACDB_PATH_MAX_LENGTH, "%s%s", ACDB_PATH, ASUS_PROJECT_NAME);
+#endif
+	
+	if (ret < 0) {
+		AGM_LOGE("ACDB -> Error: snprintf failed for project name %s, error: %d\n", ASUS_PROJECT_NAME, ret);
+		ret = -ENODEV;
+		goto err;
+	}
+#endif
+// ASUS_BSP for load customized acdb ---
+
     AGM_LOGI("acdb file path: %s\n", acdb_path);
 
     ret = get_acdb_files_from_directory(acdb_path, &acdb_files);
-    if (ret)
+    if (ret) {
+#ifdef ASUS_PROJECT_NAME
+       AGM_LOGE("ACDB -> Error: loading failed for project name %s, error: %d\n", ASUS_PROJECT_NAME, ret);
+#endif
        goto err;
+    }
 
 #ifdef ACDB_DELTA_FILE_PATH
     delta_file_path = CONV_TO_STRING(ACDB_DELTA_FILE_PATH);
